@@ -1,0 +1,92 @@
+# ===============================
+# Python Bytecode & Cache
+# ===============================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ===============================
+# Virtual Environment
+# ===============================
+venv/
+.env/
+.venv/
+
+# ===============================
+# Logs
+# ===============================
+logs/
+*.log
+
+# ===============================
+# Storage (Generated Files)
+# ===============================
+storage/input/*
+storage/output/*
+storage/temp/*
+storage/audio/*
+storage/transcripts/*
+
+# Keep folder structure but ignore contents
+!storage/input/.gitkeep
+!storage/output/.gitkeep
+!storage/temp/.gitkeep
+!storage/audio/.gitkeep
+!storage/transcripts/.gitkeep
+
+# ===============================
+# Environment Variables
+# ===============================
+.env
+.env.*
+
+# ===============================
+# Model Cache (Very Important)
+# ===============================
+.cache/
+**/__pycache__/
+**/.ipynb_checkpoints/
+
+# Torch / Whisper cache
+~/.cache/
+**/whisper/
+**/torch/
+
+# ===============================
+# IDE / Editor
+# ===============================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ===============================
+# OS Files
+# ===============================
+.DS_Store
+Thumbs.db
+
+# ===============================
+# Temporary Audio/Video Files
+# ===============================
+*.wav
+*.mp3
+*.aac
+*.flac
+*.mp4
+*.mkv
+*.avi
+
+# ===============================
+# Jupyter (if ever used)
+# ===============================
+.ipynb_checkpoints/
+
+# ===============================
+# Build / Packaging
+# ===============================
+build/
+dist/
+*.egg-info/
