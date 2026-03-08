@@ -213,7 +213,7 @@ def translate_text(input_transcript_path: str, target_language: str, output_tran
                 "duration": duration
             })
 
-            payload_json = json.dumps(batch_payload, ensure_ascii=False, indent=2)
+        payload_json = json.dumps(batch_payload, ensure_ascii=False, indent=2)
 
         prompt = f"""
         You are a translation engine.
