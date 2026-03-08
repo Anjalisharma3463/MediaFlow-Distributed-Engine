@@ -19,9 +19,10 @@
 
 
 
+import json
 import subprocess
-from pathlib import Path
-
+from pathlib import Path 
+from app.services.groq_client import client
 # validate the input video_file
 
 def validate_video_file(video_path: str):
@@ -63,6 +64,33 @@ def extract_audio_from_video(video_path: str, output_audio_path: str):
 
     return output_audio_path
 
+# Transcribe audio using Groq STT API
+
+def transcribe_audio(audio_path: str, output_transcript_path: str = None):
+    """
+    Transcribe audio using Groq STT API
+    """
+    with open(audio_path , "rb") as audio_file:
+        transcription = client.audio.transcriptions.create(
+            file=audio_file,
+            model="whisper-large-v3-turbo",
+            timestamp_granularities = ["word", "segment"],
+            response_format="verbose_json",
+        )
+        segments = []
+
+        for segment in transcription.segments:
+            segments.append({
+                "start": segment["start"],
+                "end": segment["end"],
+                "text": segment["text"]
+            })
+        if output_transcript_path:
+            with open(output_transcript_path, "w", encoding="utf-8") as f:
+                json.dump(segments, f, indent=4, ensure_ascii=False)
+        return segments
+ 
+
 
 # main pipeline
 
@@ -83,8 +111,10 @@ def run_pipeline(video_path: str):
     print("Extracting audio...")
 
     audio_path = extract_audio_from_video(str(video), str(audio_output))
-
     print("Audio extracted at:", audio_path)
+    output_transcript_path = Path("storage/transcripts") / f"{video.stem}.json"
+    transcribe_audio(audio_path , output_transcript_path)
+    print("Transcription completed.")
 
     return audio_path
 
