@@ -70,6 +70,19 @@ def transcribe_audio(audio_path: str, output_transcript_path: str = None):
     """
     Transcribe audio using Groq STT API
     """
+        # check if file exists
+    if not Path(audio_path).exists():
+        raise FileNotFoundError(f"Audio file not found: {audio_path}")
+    
+    # check extension
+    allowed_extensions = [".mp3", ".wav", ".m4a", ".ogg"]
+
+    if Path(audio_path).suffix.lower() not in allowed_extensions:
+        raise ValueError("Unsupported audio format")
+    
+    if Path(audio_path).stat().st_size == 0:
+        raise ValueError("Audio file is empty")
+
     with open(audio_path , "rb") as audio_file:
         transcription = client.audio.transcriptions.create(
             file=audio_file,
