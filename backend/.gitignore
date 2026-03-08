@@ -31,6 +31,7 @@ storage/output/*
 storage/temp/*
 storage/audio/*
 storage/transcripts/*
+storage/translated_transcripts/*
 
 # Keep folder structure but ignore contents
 !storage/input/.gitkeep
@@ -38,7 +39,7 @@ storage/transcripts/*
 !storage/temp/.gitkeep
 !storage/audio/.gitkeep
 !storage/transcripts/.gitkeep
-
+!storage/translated_transcripts/.gitkeep
 # ===============================
 # Environment Variables
 # ===============================
