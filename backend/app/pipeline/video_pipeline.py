@@ -6,6 +6,7 @@ from app.services.transcription_service import transcribe_audio
 from app.services.translation_service import translate_text
 from app.services.tts_service import text_to_speech_tts
 from app.services.audio_combiner_service import build_final_audio
+from app.services.video_merge_service import merge_video_audio
 
 def run_pipeline(video_path: str, translated_language: str):
     # user will give translated language as input in which user wants this video translate to..
@@ -17,7 +18,9 @@ def run_pipeline(video_path: str, translated_language: str):
     audio_path = f"storage/audio/extracted/{video.stem}.wav"
     transcript_path = f"storage/transcripts/{video.stem}.json"
     translated_path = f"storage/translated_transcripts/{video.stem}_translated.json"
-   
+    new_audio_path = f"storage/final/{video.stem}_final.mp3"
+    merged_video_path = f"storage/output/{video.stem}_final.mp4"
+    
     print("Extracting audio...")
     extract_audio_from_video(video_path, audio_path)
 
@@ -32,7 +35,11 @@ def run_pipeline(video_path: str, translated_language: str):
     asyncio.run(text_to_speech_tts(translated_path, translated_language, output_audio_folder))
 
     print("Combining audio segments...")
-    build_final_audio(translated_path, output_audio_folder, audio_path, f"storage/final/{video.stem}_final.mp3")
+    build_final_audio(translated_path, output_audio_folder, audio_path, new_audio_path)
+
+    print("merging video with new audio...")
+    merge_video_audio(video_path, new_audio_path, merged_video_path)
+
     print("Pipeline completed")
 
     return translated_path
