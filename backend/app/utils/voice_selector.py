@@ -25,8 +25,8 @@ def select_voice(language: str, gender: str | None = None) -> str:
         # combine all voices
         voices = []
 
+        voices += voices_data.get("multilingual", [])
         voices += voices_data.get("female", [])
         voices += voices_data.get("male", [])
-        voices += voices_data.get("multilingual", [])
 
     return random.choice(voices)
