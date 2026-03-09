@@ -1,0 +1,216 @@
+ {
+  "Hindi": {
+    "code": "hi-IN",
+    "voices": {
+      "female": [
+        "hi-IN-SwaraNeural"
+      ],
+      "male": [
+        "hi-IN-MadhurNeural"
+      ]
+    }
+  },
+
+  "English": {
+    "code": "en",
+    "voices": {
+      "female": [
+        "en-US-AriaNeural",
+        "en-US-JennyNeural",
+        "en-US-EmmaNeural",
+        "en-GB-LibbyNeural",
+        "en-IN-NeerjaNeural"
+      ],
+      "male": [
+        "en-US-GuyNeural",
+        "en-US-BrianNeural",
+        "en-GB-RyanNeural",
+        "en-IN-PrabhatNeural"
+      ],
+      "multilingual": [
+        "en-US-AndrewMultilingualNeural",
+        "en-US-AvaMultilingualNeural",
+        "en-US-BrianMultilingualNeural"
+      ]
+    }
+  },
+
+  "Spanish": {
+    "code": "es",
+    "voices": {
+      "female": [
+        "es-ES-ElviraNeural",
+        "es-MX-DaliaNeural",
+        "es-CO-SalomeNeural"
+      ],
+      "male": [
+        "es-ES-AlvaroNeural",
+        "es-MX-JorgeNeural",
+        "es-CO-GonzaloNeural"
+      ]
+    }
+  },
+
+  "French": {
+    "code": "fr",
+    "voices": {
+      "female": [
+        "fr-FR-DeniseNeural",
+        "fr-FR-EloiseNeural"
+      ],
+      "male": [
+        "fr-FR-HenriNeural"
+      ],
+      "multilingual": [
+        "fr-FR-RemyMultilingualNeural",
+        "fr-FR-VivienneMultilingualNeural"
+      ]
+    }
+  },
+
+  "German": {
+    "code": "de",
+    "voices": {
+      "female": [
+        "de-DE-AmalaNeural",
+        "de-DE-KatjaNeural"
+      ],
+      "male": [
+        "de-DE-ConradNeural",
+        "de-DE-KillianNeural"
+      ],
+      "multilingual": [
+        "de-DE-FlorianMultilingualNeural",
+        "de-DE-SeraphinaMultilingualNeural"
+      ]
+    }
+  },
+
+  "Italian": {
+    "code": "it",
+    "voices": {
+      "female": [
+        "it-IT-ElsaNeural",
+        "it-IT-IsabellaNeural"
+      ],
+      "male": [
+        "it-IT-DiegoNeural"
+      ],
+      "multilingual": [
+        "it-IT-GiuseppeMultilingualNeural"
+      ]
+    }
+  },
+
+  "Japanese": {
+    "code": "ja-JP",
+    "voices": {
+      "female": [
+        "ja-JP-NanamiNeural"
+      ],
+      "male": [
+        "ja-JP-KeitaNeural"
+      ]
+    }
+  },
+
+  "Korean": {
+    "code": "ko-KR",
+    "voices": {
+      "female": [
+        "ko-KR-SunHiNeural"
+      ],
+      "male": [
+        "ko-KR-InJoonNeural"
+      ],
+      "multilingual": [
+        "ko-KR-HyunsuMultilingualNeural"
+      ]
+    }
+  },
+
+  "Chinese": {
+    "code": "zh-CN",
+    "voices": {
+      "female": [
+        "zh-CN-XiaoxiaoNeural",
+        "zh-CN-XiaoyiNeural"
+      ],
+      "male": [
+        "zh-CN-YunjianNeural",
+        "zh-CN-YunxiNeural"
+      ]
+    }
+  },
+
+  "Arabic": {
+    "code": "ar",
+    "voices": {
+      "female": [
+        "ar-SA-ZariyahNeural",
+        "ar-AE-FatimaNeural",
+        "ar-JO-SanaNeural"
+      ],
+      "male": [
+        "ar-SA-HamedNeural",
+        "ar-AE-HamdanNeural",
+        "ar-JO-TaimNeural"
+      ]
+    }
+  },
+
+  "Portuguese": {
+    "code": "pt",
+    "voices": {
+      "female": [
+        "pt-BR-FranciscaNeural",
+        "pt-PT-RaquelNeural"
+      ],
+      "male": [
+        "pt-BR-AntonioNeural",
+        "pt-PT-DuarteNeural"
+      ],
+      "multilingual": [
+        "pt-BR-ThalitaMultilingualNeural"
+      ]
+    }
+  },
+
+  "Russian": {
+    "code": "ru-RU",
+    "voices": {
+      "female": [
+        "ru-RU-SvetlanaNeural"
+      ],
+      "male": [
+        "ru-RU-DmitryNeural"
+      ]
+    }
+  },
+
+  "Tamil": {
+    "code": "ta",
+    "voices": {
+      "female": [
+        "ta-IN-PallaviNeural",
+        "ta-SG-VenbaNeural"
+      ],
+      "male": [
+        "ta-IN-ValluvarNeural",
+        "ta-SG-AnbuNeural"
+      ]
+    }
+  },
+
+  "Telugu": {
+    "code": "te-IN",
+    "voices": {
+      "female": [
+        "te-IN-ShrutiNeural"
+      ],
+      "male": [
+        "te-IN-MohanNeural"
+      ]
+    }
+  }
+}

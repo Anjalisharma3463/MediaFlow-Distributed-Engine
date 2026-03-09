@@ -6,7 +6,8 @@ from app.services.transcription_service import transcribe_audio
 from app.services.translation_service import translate_text
 from app.services.tts_service import text_to_speech_tts
 
-def run_pipeline(video_path: str):
+def run_pipeline(video_path: str, translated_language: str):
+    # user will give translated language as input in which user wants this video translate to..
 
     validate_video_file(video_path)
 
@@ -23,11 +24,11 @@ def run_pipeline(video_path: str):
     transcribe_audio(audio_path, transcript_path)
 
     print("Translating transcript...")
-    translate_text(transcript_path, "Hindi", translated_path)
+    translate_text(transcript_path, translated_language, translated_path)
 
     print("Generating TTS audio segments...")
     output_audio_folder = f"storage/temp/tts_segments/{video.stem}"
-    asyncio.run(text_to_speech_tts(translated_path, output_audio_folder))
+    asyncio.run(text_to_speech_tts(translated_path, translated_language, output_audio_folder))
     print("Pipeline completed")
 
     return translated_path

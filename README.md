@@ -65,7 +65,24 @@ eleven labs provides:
     6.Emotion Control
 
 
-    
+did not used elevenlabs because it did not work with scripts but on gui it did work . so i used edge-tts for tts service..
+
+
+future modification:--
+1. i need to add gender specific voice.
+2. i need to add lip sync model
+3. voice clonning exactly like similar to user voice in input video.
+4. i need to clean the transcript generated from audio. like mixed languages and convert into one language like phonetic meanings etc....
+5. i will add emotions .like if audio in input video is sad then translated audio will also be in sad emotion.::
+    maybe we can map emotions like this:
+    Sad → slower, lower pitch
+    Happy → faster, higher pitch
+    Angry → slightly faster, louder, sharper pitch
+
+6. To make generated audio segments more real... like insta translate reels audio in pure hindi likie (adhhbudh word) but in real life nobody use that word like no body use proper hindi.
+7. context awareness using RAG on transcripts
+8. emotional modeling :- I can't believe this! and sometime like hello? hello !
+
 💡 How You Make It Sound Human
 
 Very important:
@@ -98,3 +115,15 @@ python -m scripts.run_pipeline
 
 
 pip freeze > requirements.txt
+
+
+
+
+
+<!-- 
+1. lets's find out by input audio or tell me in which service betwen like while stt or translation or by input audio so we have to save input audio also we were not doing that coz we don't need of that . 
+then we will extract find out that speaker based voice on bsias of gender.
+2.  skip emotions for now . or lets discuss how we can implement thisl.
+3.  will take all those edge tts langues voice and map then to language and gender in a file script and based on translated_language input we will find out voice.
+4. then we will sned this finallised voice+emotions (if we will do this now) + gender + duration from transcript ) to  edge tts to generate audio segments  by adjusting pitch and speed with text segments.
+5. at the end will merge all audio segments in final audio using pydub , also will use duration to adjust audio speed and update final audio by adding backgound music from input (original )audio .  -->
