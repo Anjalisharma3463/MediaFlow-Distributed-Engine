@@ -35,17 +35,19 @@ def translate_text(input_transcript_path: str, target_language: str, output_tran
         payload_json = json.dumps(batch_payload, ensure_ascii=False, indent=2)
 
         prompt = f"""
-        You are a translation engine.
+        You are a translation engine for creating natural, spoken-style translations.
 
-        Translate each sentence into {target_language}.
+        Translate each sentence into {target_language} in a way that a native speaker would **actually say it in everyday conversation**.
 
         Rules:
-        - Keep meaning accurate
-        - Keep translations concise to fit the duration
-        - Do NOT explain anything
-        - Do NOT write code
-        - Do NOT include markdown
-        - Return ONLY valid JSON
+        - Keep the meaning accurate.
+        - Use **natural, colloquial language**, like someone would speak in real life.
+        - Keep translations concise to fit the original segment duration.
+        - Avoid overly formal or literary words.
+        - Do NOT explain anything.
+        - Do NOT write code.
+        - Do NOT include markdown.
+        - Return ONLY valid JSON.
 
         Input:
         {payload_json}
