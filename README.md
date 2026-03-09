@@ -53,11 +53,19 @@ TOTAL: ~3-4GB max at any time
  <!-- Groq API -->
 
 Video → FFmpeg (extract) → Groq Whisper (transcribe+translate) →
-Groq TTS (natural speech) → PyDub (align) → FFmpeg (merge)
+Groq TTS (natural speech) / elevenLabs → PyDub (align) → FFmpeg (merge)
+
+here i have decide to use elevenLabs because groq tts does not provide multiple language support but elevenlavs does and elevenLabs generate High-Quality Text → Speech  than groq tts.
+eleven labs provides:
+    1. high quality audio generation
+    2. Voice Cloning of provided voice sample audio and input text
+    3. same emotion and same timing of sample audio
+    4. speaker detection - ElevenLabs separates them and generates voices accordingly.
+    5. ElevenLabs provides 10,000+ prebuilt voices.
+    6.Emotion Control
 
 
-
-
+    
 💡 How You Make It Sound Human
 
 Very important:
@@ -84,3 +92,9 @@ Then final FFmpeg merge
 py -3.10 -m venv venv
 source venv/Scripts/activate 
 pip install -r requirements.txt
+
+<!-- To run this pipeline -->
+python -m scripts.run_pipeline
+
+
+pip freeze > requirements.txt
