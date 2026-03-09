@@ -8,7 +8,7 @@ from app.services.tts_service import text_to_speech_tts
 from app.services.audio_combiner_service import build_final_audio
 from app.services.video_merge_service import merge_video_audio
 
-def run_pipeline(video_path: str, translated_language: str):
+def run_pipeline(video_path: str, translated_language: str,use_background_music: bool = True):
     # user will give translated language as input in which user wants this video translate to..
 
     validate_video_file(video_path)
@@ -35,7 +35,7 @@ def run_pipeline(video_path: str, translated_language: str):
     asyncio.run(text_to_speech_tts(translated_path, translated_language, output_audio_folder))
 
     print("Combining audio segments...")
-    build_final_audio(translated_path, output_audio_folder, audio_path, new_audio_path)
+    build_final_audio(translated_path, output_audio_folder, audio_path, new_audio_path, use_background_music=use_background_music)
 
     print("merging video with new audio...")
     merge_video_audio(video_path, new_audio_path, merged_video_path)
