@@ -4,7 +4,7 @@
 
 **MediaFlow Distributed Engine** is an AI-powered video dubbing pipeline that transforms a video into a translated version with synthesized speech.
 
-The system performs the following steps:
+The system performs the following processing stages:
 
 ```
 Video Input
@@ -28,7 +28,7 @@ Merge With Original Video
 Final Dubbed Video
 ```
 
-The goal of this project is to simulate a **real-world media processing pipeline**, focusing on modular backend architecture and scalable AI service integration.
+The objective of this project is to simulate a **real-world media processing pipeline**, focusing on modular backend architecture and scalable AI service integration.
 
 ---
 
@@ -55,13 +55,12 @@ Before implementing the system, the pipeline was designed conceptually.
 ### Tech Stack
 
 ```
-FFmpeg → audio extraction & video processing
-Groq Whisper → speech-to-text
-Groq API → translation
-Edge TTS → speech synthesis
-PyDub → audio alignment
-Demucs → background music separation
-FFmpeg → final video merge
+FFmpeg – video and audio processing
+Groq Whisper – speech-to-text
+Groq API – translation
+Edge TTS – speech synthesis
+PyDub – audio timeline reconstruction
+Demucs – background music separation
 ```
 
 ---
@@ -88,7 +87,7 @@ storage/
 
 ### Reasoning
 
-Separating logic into **services and pipeline layers** ensures the system is modular and maintainable.
+Separating logic into **services and pipeline layers** ensures the system remains modular and maintainable.
 
 ---
 
@@ -100,11 +99,11 @@ Created folder structure for storing transcript files.
 
 ### Reason
 
-Speech-to-text results must be persisted because they are:
+Speech-to-text results must be persisted because they:
 
-* reused by the translation stage
-* useful for debugging
-* required to rerun later pipeline stages without reprocessing audio
+* are reused by the translation stage
+* help with debugging
+* allow later pipeline stages to be rerun without reprocessing audio
 
 ---
 
@@ -122,9 +121,7 @@ Users may upload:
 
 ### Solution
 
-Added **video validation step** before pipeline execution.
-
-Implemented **audio extraction using FFmpeg**.
+Added a **video validation step** before pipeline execution and implemented **audio extraction using FFmpeg**.
 
 Pipeline stage:
 
@@ -142,22 +139,15 @@ Extract Audio
 
 ### Work Done
 
-Implemented speech-to-text functionality using **Groq Whisper API**.
+Implemented speech-to-text using **Groq Whisper API**.
 
-### Output
-
-Timestamped transcript such as:
-
-```
-0.00 - 3.20  Hello everyone welcome back
-3.20 - 7.10  Today we are going to discuss AI
-```
-
-Transcripts are stored in:
+STT produces **timestamped transcript segments**, which are stored in:
 
 ```
 storage/transcripts/
 ```
+
+These segments are used for translation and TTS generation.
 
 ---
 
@@ -169,7 +159,7 @@ Implemented **batch-based transcript translation** using the Groq API.
 
 ### Reasoning
 
-Instead of making many API calls:
+Instead of making one API request per segment:
 
 ```
 segment → API call
@@ -177,7 +167,7 @@ segment → API call
 segment → API call
 ```
 
-The system sends batches:
+The system sends multiple segments in a single request:
 
 ```
 multiple segments → single API call
@@ -197,12 +187,12 @@ Added validation for:
 
 * missing audio files
 * unsupported formats
-* API errors
+* API failures
 * file existence checks
 
 ### Goal
 
-Pipeline failures should **fail early with clear errors**.
+Ensure pipeline failures **fail early with clear error messages**.
 
 ---
 
@@ -247,7 +237,7 @@ Improves:
 
 Implemented a **Text-to-Speech service using Edge TTS**.
 
-Each translated segment now generates a separate audio file:
+Each translated segment generates a separate audio file:
 
 ```
 segment_0.mp3
@@ -263,32 +253,11 @@ These segments are later combined into a final audio track.
 
 ### Problem
 
-Initial translations sounded **too formal** for natural speech.
-
-Example:
-
-Formal:
-
-```
-यह अत्यंत अद्भुत अनुभव था
-```
-
-Natural speech:
-
-```
-यह सच में बहुत अच्छा अनुभव था
-```
+Initial translations sounded overly formal and unnatural for spoken dialogue.
 
 ### Solution
 
-Updated translation prompt:
-
-```
-Translate using conversational language used in real speech.
-Avoid overly formal words.
-```
-
-This significantly improved the **naturalness of generated speech**.
+Updated the translation prompt to produce **conversational language** suitable for natural speech.
 
 ---
 
@@ -298,7 +267,7 @@ This significantly improved the **naturalness of generated speech**.
 
 To rebuild the final audio track:
 
-1. Create silent audio track
+1. Create a silent audio track
 2. Place each segment at its timestamp
 3. Merge all segments
 
@@ -306,13 +275,13 @@ To rebuild the final audio track:
 
 Used **PyDub** to overlay audio segments.
 
-Each segment starts at:
+Each segment begins at:
 
 ```
 segment["start"]
 ```
 
-This preserves **speech synchronization with the original video**.
+This preserves synchronization between generated speech and the original video.
 
 ---
 
@@ -320,12 +289,12 @@ This preserves **speech synchronization with the original video**.
 
 ### Problem
 
-Replacing full audio removed:
+Replacing the full audio removed:
 
 * background music
-* ambient sounds
+* ambient sound
 
-This made the video feel unnatural.
+This made the resulting video feel unnatural.
 
 ### Solution
 
@@ -336,7 +305,7 @@ vocals
 background music
 ```
 
-The pipeline keeps background music and overlays generated speech on top.
+The pipeline retains background music and overlays the generated speech.
 
 ---
 
@@ -350,7 +319,7 @@ Generated TTS speech
 Original background music
 ```
 
-This produces a **more realistic dubbed audio track**.
+This produces a more natural dubbed audio track.
 
 ---
 
@@ -361,7 +330,7 @@ The final pipeline step merges:
 ```
 Original video stream
 +
-New generated audio
+Generated audio track
 ```
 
 Using **FFmpeg**, producing the final translated video.
@@ -382,7 +351,7 @@ segment 2 → voice B
 segment 3 → voice C
 ```
 
-Result: the same speaker sounded like **multiple people**.
+This caused the same speaker to sound like multiple people.
 
 ---
 
@@ -394,9 +363,7 @@ Voice selection occurred **inside the segment generation loop**.
 
 ### Fix
 
-Voice is now selected **once per video**.
-
-Example:
+Voice selection is now performed **once per video**.
 
 ```
 voice = select_voice(language)
@@ -426,7 +393,7 @@ True  → preserve original background music
 False → generate voice-only audio
 ```
 
-This makes the system flexible for different use cases.
+This allows the pipeline to support multiple use cases.
 
 ---
 
@@ -460,20 +427,16 @@ Output Translated Video
 
 # Current Limitations
 
-The system still lacks:
-
-1. speaker-aware voice selection
-2. lip synchronization
-3. voice cloning
-4. emotion-aware speech
-5. transcript cleaning
-6. context-aware translation
+• Speaker-aware voice selection
+• Lip synchronization
+• Voice cloning
+• Emotion-aware speech
+• Transcript normalization
+• Context-aware translation
 
 ---
 
 # Future Improvements
-
-Planned enhancements include:
 
 ### Speaker Detection
 
@@ -533,7 +496,7 @@ Angry → higher pitch
 
 ### 1 — Design the pipeline before coding
 
-Planning the pipeline prevented messy architecture.
+Planning the system architecture helped prevent messy implementation.
 
 ---
 
@@ -545,7 +508,7 @@ Separating STT, translation, and TTS improved maintainability.
 
 ### 3 — Real AI systems require multiple layers
 
-A practical system requires integration of:
+A practical AI media pipeline requires integrating:
 
 ```
 audio processing
@@ -556,89 +519,3 @@ video synchronization
 
 ---
 
-# Where This Should Be Published
-
-### 1️⃣ Inside the GitHub repository
-
-Create:
-
-```
-docs/dev-log.md
-```
-
----
-
-### 2️⃣ LinkedIn (short posts)
-
-Example topics:
-
-* Fixing inconsistent TTS voices
-* Designing a modular AI media pipeline
-* Lessons from building an AI dubbing engine
-
----
-
-### 3️⃣ Long-form technical blog
-
-Recommended platforms:
-
-* Hashnode
-* Dev.to
-* Medium
-
-Possible blog title:
-
-```
-Building an AI Video Translation Pipeline from Scratch
-```
-
----
-
-# Recommended Repository Structure
-
-```
-MediaFlow-Distributed-Engine
-│
-├─ backend
-├─ docs
-│   ├─ dev-log.md
-│   ├─ architecture.md
-│   └─ pipeline-design.md
-├─ README.md
-└─ requirements.txt
-```
-
----
-
-# Development Writing Habit
-
-For every feature or bug, document:
-
-```
-Problem
-Root Cause
-Solution
-Lesson
-```
-
-Example:
-
-```
-Problem:
-Segments had different voices.
-
-Root Cause:
-Voice was randomly selected per segment.
-
-Solution:
-Select voice once per video.
-
-Lesson:
-Shared configuration should be initialized outside loops.
-```
-
-This practice builds **engineering thinking and a strong technical portfolio**.
-
----
-
- 
