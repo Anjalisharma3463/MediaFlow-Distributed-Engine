@@ -1,31 +1,51 @@
 import json
+from pathlib import Path
 from app.services.groq_client import client
 
 
-#  translation service using Groq Translation API
+# translation service using Groq Translation API
 
 def translate_text(input_transcript_path: str, target_language: str, output_transcript_path: str):
     """
     Translate transcript segments into target language.
     """
-    # get the clean transcript
-    # clean_segments  = clean_transcript(input_transcript_path)
-    # load transcript file directly (since cleaning is disabled for now)
-    with open(input_transcript_path, "r", encoding="utf-8") as f:
+
+    input_file = Path(input_transcript_path)
+
+    # ------------------------------------------------
+    # check if input file exists
+    # ------------------------------------------------
+    if not input_file.exists():
+        raise FileNotFoundError(f"Input transcript not found: {input_transcript_path}")
+
+    # ------------------------------------------------
+    # check if file is empty
+    # ------------------------------------------------
+    if input_file.stat().st_size == 0:
+        raise ValueError("Input transcript file is empty")
+
+    # ------------------------------------------------
+    # load transcript
+    # ------------------------------------------------
+    with open(input_file, "r", encoding="utf-8") as f:
         clean_segments = json.load(f)
-    # send this text and duration to model to get the translation in batch size for each call to model
+
     BATCH_SIZE = 10
-    # this translated_segments will hold the final output of translated segments with start, end, original text and translated text
     translated_segments = []
 
-    # process the transcript in batches and make one batch_payload of segments with duration
+    # ------------------------------------------------
+    # process transcript in batches
+    # ------------------------------------------------
     for i in range(0, len(clean_segments), BATCH_SIZE):
-        batch = clean_segments[i:i+BATCH_SIZE]    
+
+        batch = clean_segments[i:i+BATCH_SIZE]
 
         batch_payload = []
+
         for idx, segment in enumerate(batch):
+
             duration = segment["end"] - segment["start"]
-            
+
             batch_payload.append({
                 "id": idx,
                 "text": segment["text"],
@@ -35,44 +55,45 @@ def translate_text(input_transcript_path: str, target_language: str, output_tran
         payload_json = json.dumps(batch_payload, ensure_ascii=False, indent=2)
 
         prompt = f"""
-        You are a translation engine for creating natural, spoken-style translations.
+You are a translation engine for creating natural, spoken-style translations.
 
-        Translate each sentence into {target_language} in a way that a native speaker would **actually say it in everyday conversation**.
+Translate each sentence into {target_language} in a way that a native speaker would actually say it in everyday conversation.
 
-        Rules:
-        - Keep the meaning accurate.
-        - Use **natural, colloquial language**, like someone would speak in real life.
-        - Keep translations concise to fit the original segment duration.
-        - Avoid overly formal or literary words.
-        - Do NOT explain anything.
-        - Do NOT write code.
-        - Do NOT include markdown.
-        - Return ONLY valid JSON.
+Rules:
+- Keep the meaning accurate.
+- Use natural, colloquial language.
+- Keep translations concise to fit the original segment duration.
+- Avoid overly formal or literary words.
+- Do NOT explain anything.
+- Do NOT write code.
+- Do NOT include markdown.
+- Return ONLY valid JSON.
 
-        Input:
-        {payload_json}
+Input:
+{payload_json}
 
-        Output format (JSON only):
-        [
-        {{"id": 0, "translated": "..."}}
-        ]
-        """
-        # send this batch_payload to model to get the translation
+Output format (JSON only):
+[
+{{"id": 0, "translated": "..."}}
+]
+"""
+
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "user", "content": prompt}
             ],
             temperature=0
+        )
 
-        ) 
-         
         result_text = response.choices[0].message.content.strip()
 
-        # remove markdown if present
+        # remove markdown if model added it
         result_text = result_text.replace("```json", "").replace("```", "").strip()
+
         print("\nMODEL RESPONSE:")
         print(result_text)
+
         try:
             batch_translations = json.loads(result_text)
         except json.JSONDecodeError:
@@ -90,14 +111,19 @@ def translate_text(input_transcript_path: str, target_language: str, output_tran
                 "original": seg["text"],
                 "translated": item["translated"]
             })
-    # save the output in output format 
-    with open(output_transcript_path, "w", encoding="utf-8") as f:
+
+    # ------------------------------------------------
+    # create output file if missing
+    # ------------------------------------------------
+    output_file = Path(output_transcript_path)
+
+    # create folder if not exists
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(translated_segments, f, indent=4, ensure_ascii=False)
 
-    print(f"✅ Translation saved to {output_transcript_path}")
-
-
-
+    print(f"✅ Translation saved to {output_file}")
 
 
 

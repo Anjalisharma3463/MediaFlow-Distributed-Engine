@@ -15,9 +15,15 @@ def run_pipeline(video_path: str, translated_language: str,use_background_music:
 
     video = Path(video_path)
 
-    audio_path = f"storage/audio/extracted/{video.stem}.wav"
-    transcript_path = f"storage/transcripts/{video.stem}.json"
-    translated_path = f"storage/translated_transcripts/{video.stem}_translated.json"
+    audio_path = f"storage/audio/extracted/{video.stem}.wav" 
+    transcripts_folder = f"storage/transcripts/{video.stem}"
+    if not Path(transcripts_folder).exists():
+        Path(transcripts_folder).mkdir(parents=True, exist_ok=True)
+    else:
+        print(f"Warning: Transcripts folder {transcripts_folder} already exists. It will be overwritten.")
+    original_transcript_path = f"{transcripts_folder}/original_transcript.json"
+    translated_path = f"{transcripts_folder}/translated_transcript.json"
+    timing_metrics_path = f"{transcripts_folder}/timing_metrics.json"
     new_audio_path = f"storage/final/{video.stem}_final.mp3"
     merged_video_path = f"storage/output/{video.stem}_final.mp4"
     
@@ -25,14 +31,14 @@ def run_pipeline(video_path: str, translated_language: str,use_background_music:
     extract_audio_from_video(video_path, audio_path)
 
     print("Transcribing audio...")
-    transcribe_audio(audio_path, transcript_path)
+    transcribe_audio(audio_path, original_transcript_path)
 
     print("Translating transcript...")
-    translate_text(transcript_path, translated_language, translated_path)
+    translate_text(original_transcript_path, translated_language, translated_path)
 
     print("Generating TTS audio segments...")
     output_audio_folder = f"storage/temp/tts_segments/{video.stem}"
-    asyncio.run(text_to_speech_tts(translated_path, translated_language, output_audio_folder))
+    asyncio.run(text_to_speech_tts(translated_path, translated_language, output_audio_folder,timing_metrics_path))
 
     print("Combining audio segments...")
     build_final_audio(translated_path, output_audio_folder, audio_path, new_audio_path, use_background_music=use_background_music)

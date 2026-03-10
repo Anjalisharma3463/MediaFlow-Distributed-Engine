@@ -35,9 +35,18 @@ def measure_segment(
 
 
 def save_timing_metrics(metrics_list, output_path):
-    with open(output_path, "w", encoding="utf-8") as f:
+
+    output_file = Path(output_path)
+
+    # ------------------------------------------------
+    # create folder if it does not exist
+    # ------------------------------------------------
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(metrics_list, f, ensure_ascii=False, indent=2)
-    print(f"Timing metrics saved to {output_path}")
+
+    print(f"Timing metrics saved to {output_file}")
 
 
 async def generate_segment(text: str, VOICE: str, output_file: str):
@@ -45,38 +54,65 @@ async def generate_segment(text: str, VOICE: str, output_file: str):
     await communicate.save(output_file)
 
 
-async def text_to_speech_tts(translated_path: str, translated_language: str, output_path_folder: str):
+async def text_to_speech_tts(
+    translated_path: str,
+    translated_language: str,
+    output_path_folder: str,
+    timing_metrics_output_path: str
+) -> str:
+
+    translated_file = Path(translated_path)
+
+    # ------------------------------------------------
+    # check if transcript exists
+    # ------------------------------------------------
+    if not translated_file.exists():
+        raise FileNotFoundError(f"Translated transcript not found: {translated_path}")
+
+    if translated_file.stat().st_size == 0:
+        raise ValueError("Translated transcript file is empty")
+
+    # ------------------------------------------------
     # Load transcript
-    with open(translated_path, "r", encoding="utf-8") as f:
+    # ------------------------------------------------
+    with open(translated_file, "r", encoding="utf-8") as f:
         transcript = json.load(f)
 
-    # Create output folder
-    if not Path(output_path_folder).exists():
-        output_folder = Path(output_path_folder)
-        output_folder.mkdir(parents=True, exist_ok=True)
-    else:
-        output_folder = Path(output_path_folder)
+    # ------------------------------------------------
+    # Create output folder for TTS segments
+    # ------------------------------------------------
+    output_folder = Path(output_path_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
 
     gender = "male"
     VOICE = select_voice(translated_language, gender)
 
-    # Build tasks with their output paths
     tasks = []
     segment_output_files = []
 
+    # ------------------------------------------------
+    # Generate audio files
+    # ------------------------------------------------
     for i, segment in enumerate(transcript):
+
         text = segment["translated"]
+
         output_file = output_folder / f"segment_{i}.mp3"
+
         segment_output_files.append(output_file)
+
         tasks.append(generate_segment(text, VOICE, str(output_file)))
 
-    # Generate ALL audio files first
+    # generate all segments
     await asyncio.gather(*tasks)
 
-    # NOW measure — audio files exist on disk at this point
+    # ------------------------------------------------
+    # Measure durations
+    # ------------------------------------------------
     timing_metrics = []
 
     for i, segment in enumerate(transcript):
+
         tts_audio_path = segment_output_files[i]
 
         metric = measure_segment(
@@ -90,14 +126,18 @@ async def text_to_speech_tts(translated_path: str, translated_language: str, out
 
         timing_metrics.append(metric)
 
-        print(f"Segment {i}: source={metric['source_duration']}s | "
-              f"tts={metric['tts_duration']}s | "
-              f"ratio={metric['expansion_ratio']}")
+        print(
+            f"Segment {i}: source={metric['source_duration']}s | "
+            f"tts={metric['tts_duration']}s | "
+            f"ratio={metric['expansion_ratio']}"
+        )
 
-    # Save once after all segments measured
+    # ------------------------------------------------
+    # Save timing metrics safely
+    # ------------------------------------------------
     save_timing_metrics(
         timing_metrics,
-        "storage/transcripts/timing_metrics.json"
+        timing_metrics_output_path
     )
 
     return str(output_folder)
