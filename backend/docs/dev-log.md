@@ -20,6 +20,8 @@
 - [Future Improvements](#future-improvements)
 - [Testing Observations](#pipeline-testing-observations-march-10-2026)
 - [Engineering Lessons](#key-engineering-lessons)
+- [March 17 — Hallucination Protection & Pipeline Wiring](#march-17-2026--hallucination-protection--pipeline-wiring)
+- [March 18 — Segment Overlap Fix & Speed Adjustment](#march-18-2026--segment-overlap-fix--speed-adjustment)
 
 ---
 
@@ -529,3 +531,85 @@ A working AI media pipeline isn't just one model — it's a combination of audio
 ---
 
 *Last updated: March 10, 2026*
+
+
+
+
+
+---
+
+## March 17, 2026 — Hallucination Protection & Pipeline Wiring
+
+### Fix — Hallucination Protection for Mixed-Language Content
+
+**Context:** March 10 testing showed transliterated English technical terms like "वाइब कोडिंग" were being mistranslated (e.g. → "Vue").
+
+**What was implemented:**
+
+**Step 1 — Term detection with `[KEEP]` markers:**
+
+Before sending to the translation API, detected transliterated technical terms get wrapped:
+```
+Input:  "अगर तुम वाइब कोडिंग से आपस बना रहा हो"
+Marked: "अगर तुम [KEEP]वाइब कोडिंग[/KEEP] से आपस बना रहा हो"
+```
+
+The translation prompt explicitly instructs the model to pass anything inside `[KEEP]` tags through verbatim — no guessing.
+
+**Step 2 — Transcript cleaning pass:**
+
+A separate LLM pass runs before translation to clean up STT noise — fixing punctuation, removing filler artifacts, normalizing code-switched phrases — so the translation model gets cleaner input.
+
+> **Status:** Fixed. "वाइब → Vue" hallucination no longer occurs.
+
+---
+
+### Refactor — Pipeline Wiring
+
+Two values that were previously not being passed between stages are now wired through:
+
+- Whisper's **detected language** is passed into `translate_text` so term detection and cleaning prompts know what source language they're working with
+- **`timing_metrics_path`** is passed into `build_final_audio` so the reconstruction stage can read the per-segment stretch strategy
+
+Without this, both stages were operating without context they needed.
+
+---
+
+## March 18, 2026 — Segment Overlap Fix & Speed Adjustment
+
+### Fix (Partial) — Timing-Aware Speed Adjustment per Segment
+
+**Context:** Timing metrics from March 10 confirmed TTS audio was often much longer than the original source slot, causing overlaps.
+
+**What was implemented:**
+
+After generating raw TTS, the pipeline now measures the expansion ratio and applies `ffmpeg atempo` to compress it back into the original slot:
+```
+expansion_ratio ≤ mild threshold  → speed up exactly to fit
+expansion_ratio > 2.0x            → cap at 1.8x to preserve quality
+```
+
+The 1.8x cap is intentional — `atempo` beyond ~2x causes audible distortion. The strategy used per segment (`exact_fit` or `capped`) gets saved into `timing_metrics.json` for the reconstruction stage to use.
+
+ 
+> **Status:** Partially fixed. Segments no longer skip or break. However, the final audio still sounds uneven — some segments play at normal speed while others feel noticeably fast. Heavily expanded segments that hit the 1.8x cap are the likely cause. Under investigation.
+
+---
+
+### Fix — Adaptive Timeline Placement to Prevent Segment Overlap
+
+**Context:** Even after speed adjustment, segments placed at fixed timestamps were still overlapping when a previous segment overflowed its slot.
+
+**What was implemented:**
+
+Replaced the fixed timestamp placement system with a **cursor-based system**:
+
+- Each segment is placed at its original timestamp **if possible**
+- If the previous segment overflowed, the cursor is pushed forward to after it finishes
+- Sync recovers automatically at the next natural silence gap
+```
+Before:  every segment placed at original timestamp regardless of overflow
+After:   cursor advances when overflow detected, snaps back at silence gaps
+```
+
+> **Status:** Fixed. Segments no longer overlap in the final audio track. 
