@@ -22,8 +22,9 @@
 - [Engineering Lessons](#key-engineering-lessons)
 - [March 17 — Hallucination Protection & Pipeline Wiring](#march-17-2026--hallucination-protection--pipeline-wiring)
 - [March 18 — Segment Overlap Fix & Speed Adjustment](#march-18-2026--segment-overlap-fix--speed-adjustment)
+- [March 21 — Translation Quality & Audio Sync Improvements](#March 21, 2026 — Translation Quality & Audio Sync Improvements)
 
----
+--- 
 
 ## Project Overview
 
@@ -613,3 +614,147 @@ After:   cursor advances when overflow detected, snaps back at silence gaps
 ```
 
 > **Status:** Fixed. Segments no longer overlap in the final audio track. 
+
+
+
+
+---
+
+## March 21, 2026 — Translation Quality & Audio Sync Improvements
+
+Four issues identified and fixed this session, all directly impacting
+how well the final dubbed audio syncs with the original video.
+
+---
+
+### Fix 1 — Isometric Translation (Speed Inconsistency Root Cause)
+
+**Problem:**
+The translation LLM was producing English text without any awareness
+of how long it had to be spoken. A 1.58 second Hindi segment was being
+translated into English text that took 4+ seconds to speak. After
+atempo compression, it still overflowed — causing the fast/slow
+inconsistency in final audio.
+
+**Root cause:**
+`duration_seconds` was already being sent to the LLM in the batch
+payload but the system prompt never told the model to use it.
+The model ignored it completely.
+
+**Fix:**
+Added isometric translation rule to system prompt:
+```
+ISOMETRIC TRANSLATION — each segment has a duration_seconds field.
+Your translation must be speakable in approximately that many seconds.
+Do NOT cut meaning. Instead use:
+- Contractions: "do not" → "don't"
+- Natural short forms: "in order to" → "to"
+- Active voice: "is going to be built" → "will build"
+```
+
+**Why this helps audio sync:**
+When translated text is closer in spoken length to the original,
+the TTS expansion ratio drops. Less atempo compression needed.
+Less compression = more natural sounding speech = better sync.
+
+---
+
+### Fix 2 — Short Segment Merging (Fragment Translations)
+
+**Problem:**
+Whisper splits audio into segments based on silence gaps. Very short
+segments (under 1.5 seconds) were often mid-sentence fragments:
+```
+Segment: "and now the latest things"       (1.94s)
+Segment: "is building with islands"        (1.70s)
+```
+
+These translated as disconnected fragments — sounded weird in the
+final audio with unnatural gaps mid-sentence.
+
+**Fix:**
+Added `merge_short_segments()` before the cleaning pass:
+```python
+def merge_short_segments(segments, min_duration=2.0):
+    # merges segments shorter than min_duration with the next segment
+```
+```
+Before: "and now the latest things" + "is building with islands"
+After:  "and now the latest thing is building with islands"
+```
+
+**Why this helps audio sync:**
+Merged segments generate one continuous TTS audio clip instead of
+two short ones with a gap between them. The gap that existed between
+the two original segments is now available as speaking room for the
+merged translation — reducing the need for speed compression.
+
+---
+
+### Fix 3 — Cleaning Pass Preserving Mixed Language
+
+**Problem:**
+The STT cleaning pass was converting Hinglish/mixed language words
+into pure Hindi equivalents:
+```
+Original spoken: "और अब जो सबसे latest चीजें है"
+After cleaning:  "और अब जो सबसे नवीनतम चीजें हैं।"
+                                ↑ "latest" replaced with pure Hindi
+```
+
+This is wrong — the speaker said "latest" in English deliberately.
+Replacing it changes the register and tone of the translation.
+
+**Fix:**
+Added explicit rule to cleaning prompt:
+```
+NEVER translate words to pure {source_language} —
+preserve English/mixed words exactly as spoken.
+```
+
+**Why this helps translation quality:**
+The translation LLM now receives the text closer to what was actually
+spoken. Term detection and [KEEP] markers work correctly because the
+mixed-language words are still present in their original form.
+
+---
+
+### Fix 4 — Context Window Increased
+
+**Problem:**
+With `CONTEXT_WINDOW = 3`, the translation model sometimes lost
+consistency across batches — using different phrasing for the same
+concept earlier vs later in the video.
+
+**Fix:**
+Increased to `CONTEXT_WINDOW = 5` — model now sees 5 previous
+translated segments before each new batch.
+
+**Why this helps:**
+Consistent terminology throughout the video means TTS generates
+audio with consistent rhythm and pacing — fewer jarring transitions
+between segments in the final dubbed track.
+
+---
+
+### Combined Impact on Audio Pipeline
+
+These four fixes work together in the pipeline:
+```
+Merge short fragments          → fewer gaps, more speaking room per segment
+Isometric translation          → translated text fits original time slot better  
+Preserve mixed language        → cleaner input to translation LLM
+Larger context window          → consistent terminology = consistent TTS rhythm
+                                                    ↓
+                              Lower expansion ratios in TTS
+                                                    ↓
+                              Less atempo compression needed
+                                                    ↓
+                              More natural sounding final audio
+```
+
+> **Status:** Translation stage significantly improved. Expansion ratios
+> are lower. Fragment segments eliminated. Speed inconsistency reduced
+> but not fully resolved — timeline reconstruction fix still pending.
+
+*Last updated: March 21, 2026*
