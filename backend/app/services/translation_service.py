@@ -250,6 +250,33 @@ LANGUAGE_STYLE_GUIDE = {
     "indonesian": "Informal Indonesian (bahasa gaul where appropriate). Match speaker's tone.",
 }
 
+def merge_short_segments(segments, min_duration=1.5):
+    """
+    Merge segments shorter than min_duration with the next segment.
+    Prevents fragment translations that sound incomplete.
+    """
+    merged = []
+    i = 0
+    while i < len(segments):
+        seg = segments[i]
+        duration = seg["end"] - seg["start"]
+
+        if duration < min_duration and i + 1 < len(segments):
+            next_seg = segments[i + 1]
+            merged.append({
+                "start": seg["start"],
+                "end": next_seg["end"],
+                "text": seg["text"] + " " + next_seg["text"]
+            })
+            i += 2
+        else:
+            merged.append(seg)
+            i += 1
+
+    return merged
+
+
+# MAIN ENTRY POINT
 
 # MAIN ENTRY POINT
 
@@ -292,9 +319,14 @@ def translate_text(
     print(f"Source   : {source_language}")
     print(f"Target   : {target_language}")
 
-    # ── STAGE 1: Detect video-specific technical terms ──────────────────
+# ── STAGE 1: Detect video-specific technical terms ──────────────────
     print(f"\n[1/3] Detecting technical terms...")
     term_map = detect_technical_terms(raw_segments, source_language)
+
+    # ── STAGE 1.5: Merge short fragment segments ─────────────────────────
+    print(f"\n[1.5/3] Merging short segments...")
+    raw_segments = merge_short_segments(raw_segments, min_duration=1.5)
+    print(f"After merge: {len(raw_segments)} segments")
 
     # ── STAGE 2: Clean raw STT noise ────────────────────────────────────
     print(f"\n[2/3] Cleaning transcript...")
@@ -305,7 +337,7 @@ def translate_text(
     print(f"\n[3/3] Translating...")
 
     BATCH_SIZE = 10
-    CONTEXT_WINDOW = 3  # previous translated segments shown to each new batch
+    CONTEXT_WINDOW = 5  # previous translated segments shown to each new batch
                         # gives the model memory of what was already said
                         # prevents terminology drift between batches
 
@@ -316,20 +348,7 @@ def translate_text(
     )
     total_batches = (len(cleaned_segments) + BATCH_SIZE - 1) // BATCH_SIZE
 
-    system_prompt = f"""You are a professional dubbing translator for video content.
 
-Source language: {source_language}
-Target language: {target_language}
-Style requirement: {style_guide}
-
-Rules:
-1. Translate for SPOKEN delivery — short sentences, natural rhythm
-2. Match the speaker's energy: casual stays casual, excited stays excited
-3. [KEEP]...[/KEEP] markers are UNTOUCHABLE — preserve them character-for-character
-4. Keep translations CONCISE — voice must fit original timing
-5. Consistent terminology — use the same translation for the same term throughout
-6. No explanations, no notes, no markdown
-7. Return ONLY valid JSON"""
 
     for i in range(0, len(cleaned_segments), BATCH_SIZE):
 
@@ -363,6 +382,27 @@ Rules:
             })
 
         payload_json = json.dumps(batch_payload, ensure_ascii=False, indent=2)
+
+        system_prompt = f"""You are a professional dubbing translator for video content.
+
+Source language: {source_language}
+Target language: {target_language}
+Style requirement: {style_guide}
+
+Rules:
+1. Translate for SPOKEN delivery — natural rhythm, conversational tone
+2. Match the speaker's energy: casual stays casual, excited stays excited  
+3. [KEEP]...[/KEEP] markers are UNTOUCHABLE — preserve them exactly
+4. ISOMETRIC TRANSLATION — each segment has a duration_seconds field.
+   Your translation must be speakable in approximately that many seconds.
+   Do NOT cut meaning. Instead use:
+   - Contractions: "do not" → "don't", "it is" → "it's"
+   - Natural short forms: "in order to" → "to"  
+   - Active voice: "is going to be built" → "will build"
+   Keep full meaning, just use natural spoken shortcuts.
+5. Maintain consistent terminology throughout the video
+6. No explanations, no notes, no markdown
+7. Return ONLY valid JSON"""
 
         user_prompt = (
             f"{context_str}"
