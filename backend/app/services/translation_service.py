@@ -178,13 +178,14 @@ def clean_transcript_segments(segments: list, source_language: str) -> list:
 
         system_prompt = f"""You clean speech-to-text transcript output in {source_language}.
 
-Fix only:
-1. Obvious STT errors and mishearings
-2. Run-on text without punctuation — add minimal punctuation
-3. Filler words: um, uh, hmm and their equivalents in {source_language}
+        Fix only:
+        1. Obvious STT errors and mishearings
+        2. Run-on text without punctuation — add minimal punctuation
+        3. Filler words: um, uh, hmm and their equivalents in {source_language}
 
-Never translate. Never change meaning. Never explain.
-Return ONLY valid JSON array."""
+        NEVER translate words to pure {source_language} — preserve English/mixed words exactly as spoken.
+        Never translate. Never change meaning. Never explain.
+        Return ONLY valid JSON array."""
 
         user_prompt = f"""Clean these segments. Language: {source_language}
 
@@ -325,7 +326,7 @@ def translate_text(
 
     # ── STAGE 1.5: Merge short fragment segments ─────────────────────────
     print(f"\n[1.5/3] Merging short segments...")
-    raw_segments = merge_short_segments(raw_segments, min_duration=1.5)
+    raw_segments = merge_short_segments(raw_segments, min_duration=2.0)
     print(f"After merge: {len(raw_segments)} segments")
 
     # ── STAGE 2: Clean raw STT noise ────────────────────────────────────
