@@ -23,8 +23,10 @@
 - [March 17 — Hallucination Protection & Pipeline Wiring](#march-17-2026--hallucination-protection--pipeline-wiring)
 - [March 18 — Segment Overlap Fix & Speed Adjustment](#march-18-2026--segment-overlap-fix--speed-adjustment)
 - [March 21 — Translation Quality & Audio Sync Improvements](#March 21, 2026 — Translation Quality & Audio Sync Improvements)
+- [March 22 — Audio Sync & Speed Consistency Fix](#March 22, 2026 — Audio Sync & Speed Consistency Fix)
 
---- 
+---  
+
 
 ## Project Overview
 
@@ -758,3 +760,156 @@ Larger context window          → consistent terminology = consistent TTS rhyth
 > but not fully resolved — timeline reconstruction fix still pending.
 
 *Last updated: March 21, 2026*
+
+
+
+---
+
+## March 22, 2026 — Audio Sync & Speed Consistency Fix
+
+This session focused on fixing the core audio timing issue — final dubbed
+audio was 1:22 for a 1:15 original video. After fixes, it's now 1:17.
+
+---
+
+### The Core Problem — Speed Was Being Calculated Wrong
+
+**What was happening:**
+```
+source_duration  = time original Hindi was spoken    (e.g. 2.26s)
+tts_duration     = time English TTS audio takes      (e.g. 4.08s)
+ratio            = 4.08 / 2.26 = 1.8x
+speed applied    = 1.8x atempo → sounds very fast
+```
+
+The pipeline was squeezing TTS audio into `source_duration` only —
+ignoring the silence gap that exists before the next segment starts.
+That gap is available speaking room that was being wasted.
+
+**Root cause confirmed from timing_metrics.json:**
+```
+Segment 13: source=1.64s  ratio=1.97x  → very fast
+Segment 14: source=1.68s  ratio=2.01x  → capped, overflow into next
+Segment 6:  source=2.26s  ratio=1.80x  → fast
+```
+
+All fast segments had short source slots. Long source slots were fine.
+The silence gap between segments was never being used.
+
+---
+
+### Fix 1 — Available Window (tts_service.py)
+
+Instead of fitting TTS into `source_duration`, the pipeline now calculates
+the full available window to the next segment start:
+```python
+# OLD — only used source slot
+speed_factor = tts_duration / source_duration
+
+# NEW — uses full available window including silence gap
+if i + 1 < len(transcript):
+    next_start = transcript[i + 1]["start"]
+    available_window = next_start - source_start  # includes silence gap
+else:
+    available_window = source_duration
+
+speed_factor = tts_duration / available_window
+```
+
+**Applied to segment 13:**
+```
+OLD: fit 3.24s into 1.64s slot → ratio 1.97x → very fast
+NEW: fit 3.24s into 3.32s window (includes gap) → ratio 0.97x → no speed needed
+```
+
+---
+
+### Fix 2 — Speed Cap Reduced from 1.8x to 1.4x
+
+Research confirms humans perceive speed change above 1.4x.
+Previous cap of 1.8x was causing noticeably fast segments.
+```python
+# OLD
+RATIO_MAX_STRETCH = 2.0
+return 1.8, "capped"
+
+# NEW  
+RATIO_MAX_STRETCH = 1.4
+return 1.4, "capped"
+```
+
+---
+
+### Fix 3 — Adaptive Placement Tracks Overflow Separately
+
+`audio_reconstruction.py` now distinguishes three placement strategies:
+```
+"on_time"  → placed at exact original timestamp, fits perfectly
+"pushed"   → cursor advanced past original timestamp to avoid overlap
+"overflow" → fits in original slot but audio spills into silence gap
+```
+
+This makes it easier to debug sync issues — know exactly which segments
+are causing drift and by how much.
+
+---
+
+### Fix 4 — Short Segment Merge Threshold Increased
+
+Increased `min_duration` from 1.5s to 2.0s in `translate_service.py`.
+More fragment segments now get merged before translation:
+```
+Before: segments 16, 17 still fragments at 1.94s and 1.70s
+After:  both merged into one complete sentence
+```
+
+---
+
+### Fix 5 — Cleaning Pass Preserves Mixed Language
+
+Added rule to STT cleaning prompt:
+```
+NEVER translate words to pure {source_language} —
+preserve English/mixed words exactly as spoken.
+```
+
+Prevents the cleaning LLM from converting Hinglish words like
+"latest" into pure Hindi equivalents before translation.
+
+---
+
+### Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Final audio duration | 1:22 | 1:17 |
+| Original video duration | 1:15 | 1:15 |
+| Segments at ratio > 1.6x | Several | Zero |
+| Capped segments (>2.0x) | Present | Zero |
+| Speed cap | 1.8x | 1.4x |
+
+**Expansion ratio distribution after fix:**
+```
+ratio < 1.1   (perfect):    7 segments  
+ratio 1.1-1.4 (good):       9 segments  
+ratio 1.4-1.6 (acceptable): 5 segments  
+ratio > 1.6   (problem):    0 segments  
+```
+
+> **Status:** Significantly improved. Audio timing is much closer to
+> original. Remaining gap (1:17 vs 1:15) is from segments where even
+> the full available window isn't enough — translation text still
+> slightly too long. Multilingual testing pending.
+
+---
+
+### Open Questions
+
+- Does available window fix work equally well for non-Hindi languages?
+- Does isometric translation rule produce consistently shorter text
+  across French, Spanish, Japanese?
+- Voice quality (Edge TTS robotic) — next improvement after sync stable.
+
+
+
+*Last updated: March 22, 2026*
