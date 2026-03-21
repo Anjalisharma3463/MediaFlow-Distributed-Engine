@@ -42,7 +42,7 @@ def transcribe_audio(audio_path: str, output_transcript_path: str = None):
 
         transcription = client.audio.transcriptions.create(
             file=audio_file,
-            model="whisper-large-v3-turbo",
+            model="whisper-large-v3",
             timestamp_granularities=["word", "segment"],
             response_format="verbose_json",
         )
