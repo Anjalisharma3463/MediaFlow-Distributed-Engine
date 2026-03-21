@@ -84,37 +84,103 @@ def load_timing_metrics(metrics_path: str) -> dict:
 
 # ADAPTIVE PLACEMENT ENGINE
 
+# def compute_placement_positions(
+#     transcript: list,
+#     segments_folder: Path,
+#     timing_metrics: dict
+# ) -> list:
+#     """
+#     Compute the actual placement position for each segment on the timeline.
+
+#     For each segment:
+#       preferred_start = original transcript timestamp (video sync)
+#       actual_start    = max(preferred_start, cursor)  ← never overlap previous
+#       cursor          = actual_start + segment_duration + MIN_GAP_MS
+
+#     Returns list of placement dicts:
+#     [
+#       {
+#         "segment_index": 0,
+#         "preferred_start_ms": 1000,
+#         "actual_start_ms": 1000,
+#         "segment_duration_ms": 850,
+#         "pushed_ms": 0,           ← how much it was pushed forward from preferred
+#         "strategy": "on_time"     ← "on_time" | "pushed"
+#       }
+#     ]
+#     """
+#     placements = []
+#     cursor_ms = 0  # earliest the next segment can start
+
+#     for i, segment in enumerate(transcript):
+
+#         preferred_start_ms = int(segment["start"] * 1000)
+
+#         segment_file = segments_folder / f"segment_{i}.mp3"
+
+#         if not segment_file.exists():
+#             print(f"Missing segment file: {segment_file} — skipping")
+#             continue
+
+#         segment_duration_ms = get_audio_duration_ms(str(segment_file))
+
+#         # adaptive placement decision
+#         actual_start_ms = max(preferred_start_ms, cursor_ms)
+#         pushed_ms = actual_start_ms - preferred_start_ms
+#         strategy = "on_time" if pushed_ms == 0 else "pushed"
+
+#         placements.append({
+#             "segment_index":       i,
+#             "segment_file":        str(segment_file),
+#             "preferred_start_ms":  preferred_start_ms,
+#             "actual_start_ms":     actual_start_ms,
+#             "segment_duration_ms": segment_duration_ms,
+#             "pushed_ms":           pushed_ms,
+#             "strategy":            strategy
+#         })
+
+#         # advance cursor past end of this segment + minimum gap
+#         cursor_ms = actual_start_ms + segment_duration_ms + MIN_GAP_MS
+
+#         # log segments that were pushed
+#         if pushed_ms > 0:
+#             print(
+#                 f"   [seg {i:03d}] pushed +{pushed_ms}ms "
+#                 f"(preferred={preferred_start_ms}ms → actual={actual_start_ms}ms)"
+#             )
+
+#     return placements
+ 
+
 def compute_placement_positions(
     transcript: list,
     segments_folder: Path,
     timing_metrics: dict
 ) -> list:
     """
-    Compute the actual placement position for each segment on the timeline.
-
-    For each segment:
-      preferred_start = original transcript timestamp (video sync)
-      actual_start    = max(preferred_start, cursor)  ← never overlap previous
-      cursor          = actual_start + segment_duration + MIN_GAP_MS
-
-    Returns list of placement dicts:
-    [
-      {
-        "segment_index": 0,
-        "preferred_start_ms": 1000,
-        "actual_start_ms": 1000,
-        "segment_duration_ms": 850,
-        "pushed_ms": 0,           ← how much it was pushed forward from preferred
-        "strategy": "on_time"     ← "on_time" | "pushed"
-      }
-    ]
+    Compute placement using available window between segments.
+    
+    Key change from previous version:
+    - available_window = next_segment_start - this_segment_start
+    - if TTS fits in window → place at original timestamp, no push
+    - if TTS overflows window → push only as much as needed
+    - cursor tracks where we actually are
     """
     placements = []
-    cursor_ms = 0  # earliest the next segment can start
+    cursor_ms = 0
 
     for i, segment in enumerate(transcript):
 
         preferred_start_ms = int(segment["start"] * 1000)
+
+        # calculate available window
+        if i + 1 < len(transcript):
+            next_start_ms = int(transcript[i + 1]["start"] * 1000)
+            available_window_ms = next_start_ms - preferred_start_ms
+        else:
+            available_window_ms = int(
+                (segment["end"] - segment["start"]) * 1000
+            )
 
         segment_file = segments_folder / f"segment_{i}.mp3"
 
@@ -124,33 +190,51 @@ def compute_placement_positions(
 
         segment_duration_ms = get_audio_duration_ms(str(segment_file))
 
-        # adaptive placement decision
+        # placement decision
         actual_start_ms = max(preferred_start_ms, cursor_ms)
         pushed_ms = actual_start_ms - preferred_start_ms
-        strategy = "on_time" if pushed_ms == 0 else "pushed"
+
+        # does it fit in available window from actual start?
+        end_ms = actual_start_ms + segment_duration_ms
+        next_start_absolute = preferred_start_ms + available_window_ms
+        overflows_ms = max(0, end_ms - next_start_absolute)
+
+        if pushed_ms == 0 and overflows_ms == 0:
+            strategy = "on_time"
+        elif pushed_ms > 0:
+            strategy = "pushed"
+        else:
+            strategy = "overflow"   # fits in original slot but spills into gap
 
         placements.append({
-            "segment_index":       i,
-            "segment_file":        str(segment_file),
-            "preferred_start_ms":  preferred_start_ms,
-            "actual_start_ms":     actual_start_ms,
-            "segment_duration_ms": segment_duration_ms,
-            "pushed_ms":           pushed_ms,
-            "strategy":            strategy
+            "segment_index":        i,
+            "segment_file":         str(segment_file),
+            "preferred_start_ms":   preferred_start_ms,
+            "actual_start_ms":      actual_start_ms,
+            "available_window_ms":  available_window_ms,
+            "segment_duration_ms":  segment_duration_ms,
+            "pushed_ms":            pushed_ms,
+            "overflows_ms":         overflows_ms,
+            "strategy":             strategy
         })
 
-        # advance cursor past end of this segment + minimum gap
+        # advance cursor — minimum gap between segments
         cursor_ms = actual_start_ms + segment_duration_ms + MIN_GAP_MS
 
-        # log segments that were pushed
-        if pushed_ms > 0:
+        if pushed_ms > 0 or overflows_ms > 0:
             print(
-                f"   [seg {i:03d}] pushed +{pushed_ms}ms "
-                f"(preferred={preferred_start_ms}ms → actual={actual_start_ms}ms)"
+                f"   [seg {i:03d}] "
+                f"start={actual_start_ms}ms | "
+                f"duration={segment_duration_ms}ms | "
+                f"window={available_window_ms}ms | "
+                f"pushed={pushed_ms}ms | "
+                f"overflow={overflows_ms}ms | "
+                f"{strategy}"
             )
 
     return placements
- 
+
+
 # MAIN ENTRY  POINT
 
 def build_final_audio(

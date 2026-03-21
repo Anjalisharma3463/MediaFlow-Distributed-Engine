@@ -34,8 +34,8 @@ from pydub import AudioSegment
 # Tuned for natural sound quality 
 
 RATIO_NO_ADJUST   = 1.3   # under this → leave audio alone
-RATIO_MAX_STRETCH = 2.0   # above this → cap speed, flag for adaptive placement
-                           # going above 2.0x atempo sounds unnatural
+RATIO_MAX_STRETCH = 1.4  # professional standard
+
 
  
 # FFMPEG TIME-STRETCH
@@ -88,38 +88,71 @@ def speed_adjust_audio(input_path: str, output_path: str, speed_factor: float) -
     return True
 
 
-def compute_target_speed(source_duration: float, tts_duration: float) -> tuple[float, str]:
+# def compute_target_speed(source_duration: float, tts_duration: float) -> tuple[float, str]:
+#     """
+#     Decide how much to speed up TTS audio.
+
+#     Returns:
+#         (speed_factor, strategy)
+
+#     Strategies:
+#         "none"     → audio fits, no adjustment
+#         "mild"     → slight speedup, will sound natural
+#         "capped"   → over 2.0x, cap at 1.8x, audio_reconstruction handles the rest
+#     """
+
+#     if source_duration <= 0:
+#         return 1.0, "none"
+
+#     ratio = tts_duration / source_duration
+
+#     if ratio <= RATIO_NO_ADJUST:
+#         return 1.0, "none"
+
+#     elif ratio <= RATIO_MAX_STRETCH:
+#         # speed up to fit exactly — sounds natural under 2.0x
+#         speed_factor = ratio
+#         return speed_factor, "mild"
+
+#     else:
+#         # over 2.0x would sound unnatural
+#         # cap at 1.8x (slightly under max for quality headroom)
+#         # audio_reconstruction will use adaptive placement for the remainder
+#         return 1.8, "capped"
+
+
+def compute_target_speed(
+    source_duration: float,
+    tts_duration: float,
+    available_window: float  # ← new parameter: time to next segment start
+) -> tuple[float, str]:
     """
-    Decide how much to speed up TTS audio.
-
-    Returns:
-        (speed_factor, strategy)
-
-    Strategies:
-        "none"     → audio fits, no adjustment
-        "mild"     → slight speedup, will sound natural
-        "capped"   → over 2.0x, cap at 1.8x, audio_reconstruction handles the rest
+    Decide speed using available_window (gap to next segment),
+    not just source_duration.
+    
+    available_window = next_segment_start - this_segment_start
+    This includes the silence gap — extra room to speak naturally.
     """
 
     if source_duration <= 0:
         return 1.0, "none"
 
-    ratio = tts_duration / source_duration
+    # use available window — not just source slot
+    # this is the key difference from naive approach
+    fit_duration = max(available_window, source_duration)
+    ratio = tts_duration / fit_duration
 
-    if ratio <= RATIO_NO_ADJUST:
-        return 1.0, "none"
+    if ratio <= 1.1:
+        return 1.0, "none"          # fits perfectly — no touch
 
-    elif ratio <= RATIO_MAX_STRETCH:
-        # speed up to fit exactly — sounds natural under 2.0x
-        speed_factor = ratio
-        return speed_factor, "mild"
+    elif ratio <= 1.4:
+        return ratio, "mild"         # slight speedup, sounds natural
 
+    elif ratio <= 2.0:
+        return 1.4, "mild"           # cap at 1.4x — sounds ok
+                                     # (you had 1.8x — too aggressive)
     else:
-        # over 2.0x would sound unnatural
-        # cap at 1.8x (slightly under max for quality headroom)
-        # audio_reconstruction will use adaptive placement for the remainder
-        return 1.8, "capped"
-
+       return 1.4, "capped"   # still cap at 1.4x, flag adaptive
  
 # CORE TTS GENERATION 
 
@@ -263,13 +296,23 @@ async def text_to_speech_tts(
 
         source_start    = segment["start"]
         source_end      = segment["end"]
-        source_duration = source_end - source_start
 
         raw_file        = raw_files[i]
         final_file      = output_folder / f"segment_{i}.mp3"
 
+        source_duration = source_end - source_start
+
+        # calculate available window to next segment
+        if i + 1 < len(transcript):
+            next_start = transcript[i + 1]["start"]
+            available_window = next_start - source_start  # includes silence gap
+        else:
+            available_window = source_duration  # last segment — use source only
+
         raw_tts_duration = get_audio_duration_ms(str(raw_file))
-        speed_factor, strategy = compute_target_speed(source_duration, raw_tts_duration)
+        speed_factor, strategy = compute_target_speed(
+            source_duration, raw_tts_duration, available_window
+        )
 
         # apply speed adjustment
         if strategy == "none":
