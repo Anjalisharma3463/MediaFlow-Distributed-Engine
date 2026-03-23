@@ -53,11 +53,10 @@ def speed_adjust_audio(input_path: str, output_path: str, speed_factor: float) -
     Returns True if successful, False if ffmpeg failed.
     """
 
-    if speed_factor <= 1.0:
-        # no adjustment needed, just copy
-        import shutil
-        shutil.copy(input_path, output_path)
-        return True
+    if 0.95 <= speed_factor <= 1.05:
+            import shutil
+            shutil.copy(input_path, output_path)
+            return True
 
     # clamp to safe maximum
     speed_factor = min(speed_factor, RATIO_MAX_STRETCH)
@@ -142,8 +141,15 @@ def compute_target_speed(
     fit_duration = max(available_window, source_duration)
     ratio = tts_duration / fit_duration
 
-    if ratio <= 1.1:
-        return 1.0, "none"          # fits perfectly — no touch
+# TTS too short — slow it down to match source duration exactly
+    if ratio < 0.9:
+        # slow down to match source_duration
+        # use source_duration not available_window — we want to fill the speech slot
+        slow_factor = tts_duration / source_duration
+        return slow_factor, "slowed"
+
+    elif ratio <= 1.1:
+        return 1.0, "none"
 
     elif ratio <= 1.4:
         return ratio, "mild"         # slight speedup, sounds natural
@@ -288,9 +294,10 @@ async def text_to_speech_tts(
     print(f"\n   Adjusting timing...")
 
     timing_metrics = []
-    none_count  = 0
-    mild_count  = 0 
+    none_count   = 0
+    mild_count   = 0
     capped_count = 0
+    slowed_count = 0
 
     for i, segment in enumerate(transcript):
 
@@ -339,7 +346,10 @@ async def text_to_speech_tts(
                 mild_count += 1
             elif strategy == "capped":
                 capped_count += 1
+            elif strategy == "slowed":
+                slowed_count += 1
 
+        print(f"   no_change={none_count} | mild_speedup={mild_count} | capped={capped_count} | slowed={slowed_count}")
         # record metrics
         metric = build_timing_metric(
             segment_index=i,
@@ -367,7 +377,7 @@ async def text_to_speech_tts(
     save_timing_metrics(timing_metrics, timing_metrics_output_path)
 
     print(f"\n   Adjustment summary:")
-    print(f"   no_change={none_count} | mild_speedup={mild_count} | capped={capped_count}")
+    print(f"   no_change={none_count} | mild_speedup={mild_count} | capped={capped_count} | slowed={slowed_count}")
     print(f"   (capped segments will use adaptive placement in audio reconstruction)")
     print(f"{'='*60}\n")
 
