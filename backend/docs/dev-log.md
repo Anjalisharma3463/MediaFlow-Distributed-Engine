@@ -24,6 +24,7 @@
 - [March 18 — Segment Overlap Fix & Speed Adjustment](#march-18-2026--segment-overlap-fix--speed-adjustment)
 - [March 21 — Translation Quality & Audio Sync Improvements](#March 21, 2026 — Translation Quality & Audio Sync Improvements)
 - [March 22 — Audio Sync & Speed Consistency Fix](#March 22, 2026 — Audio Sync & Speed Consistency Fix)
+- [March 24, 2026 — TTS Slowing Fix (Silence Gap Problem)](#March 24, 2026 — TTS Slowing Fix (Silence Gap Problem))
 
 ---  
 
@@ -913,3 +914,42 @@ ratio > 1.6   (problem):    0 segments
 
 
 *Last updated: March 22, 2026*
+
+
+---
+
+## March 24, 2026 — TTS Slowing Fix (Silence Gap Problem)
+
+**Problem:**
+When the original speaker speaks slowly or dramatically, translated
+English TTS finishes much faster than the original speech slot —
+leaving large silence gaps in the final dubbed audio.
+```
+Original speaker: 5.06s slot (slow, dramatic delivery)
+Raw TTS:          3.816s  (ratio = 0.754 — too short)
+Result:           ~1.2s of dead silence after speech ends
+```
+
+**Fix in `tts_service.py` — added `"slowed"` strategy:**
+```python
+if ratio < 0.9:
+    slow_factor = tts_duration / source_duration
+    return slow_factor, "slowed"
+```
+
+Uses `source_duration` as the target — fills the speech slot exactly.
+atempo handles values below 1.0 natively (range 0.5–2.0).
+
+Updated `speed_adjust_audio` to not skip values below 1.0:
+```python
+if 0.95 <= speed_factor <= 1.05:
+    # copy only if effectively no change
+```
+
+Added `slowed_count` to summary logging.
+
+> **Status:** Fixed. Segments with slow/dramatic delivery now match
+> source duration. Silence gaps eliminated.
+
+
+*Last updated: March 24, 2026*
